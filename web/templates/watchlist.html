@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}關注清單 — TicketPulse{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>🎯 關注清單</h2>
+</div>
+
+<div class="add-form card">
+  <h3>新增關注</h3>
+  <p class="hint">貼上演唱會售票頁面的完整網址（支援 KKTIX、TixCraft、拓元、ibon、寬宏藝術）</p>
+  <div class="form-row">
+    <input type="url" id="watch-url" class="input" placeholder="https://kktix.com/events/..." />
+    <button class="btn btn-primary" onclick="addWatch()">+ 加入關注</button>
+  </div>
+  <p id="add-msg" class="msg"></p>
+</div>
+
+<div id="watchlist-container">
+  <p class="loading">載入中...</p>
+</div>
+
+<script>
+async function loadWatchlist() {
+  const res = await fetch('/api/watchlist/');
+  const items = await res.json();
+  const el = document.getElementById('watchlist-container');
+
+  if (!items.length) {
+    el.innerHTML = '<p class="empty-state">尚無關注的演唱會。使用上方表單新增！</p>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="item-list">
+      ${items.map(item => `
+        <div class="item-card" id="item-${item.id}">
+          <div class="item-info">
+            <div class="item-title">${item.concert.name}</div>
+            <div class="item-meta">
+              <span>📍 ${item.concert.venue || '-'}</span>
+              ${item.concert.date ? `<span>📅 ${item.concert.date.slice(0,10)}</span>` : ''}
+              <span class="tag tag-${item.status}">${{watching:'👀 關注中',notified:'🔔 已通知',expired:'💤 已過期'}[item.status] || item.status}</span>
+            </div>
+            <a class="item-link" href="${item.concert.ticket_url}" target="_blank" rel="noopener">前往售票網站 →</a>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removeWatch(${item.id})">移除</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function addWatch() {
+  const url = document.getElementById('watch-url').value.trim();
+  const msg = document.getElementById('add-msg');
+  if (!url) { msg.textContent = '請輸入網址'; msg.className = 'msg error'; return; }
+
+  msg.textContent = '處理中...'; msg.className = 'msg';
+
+  // The watchlist add goes through the bot's scraper via API
+  // For now we POST to a simple add endpoint
+  const res = await fetch('/api/watchlist/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url })
+  });
+
+  if (res.ok) {
+    msg.textContent = '✅ 已加入關注清單！';
+    msg.className = 'msg success';
+    document.getElementById('watch-url').value = '';
+    loadWatchlist();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = '❌ ' + (data.detail || '加入失敗，請確認網址是否正確');
+    msg.className = 'msg error';
+  }
+}
+
+async function removeWatch(itemId) {
+  if (!confirm('確定要從關注清單移除？')) return;
+  const res = await fetch(`/api/watchlist/${itemId}`, { method: 'DELETE' });
+  if (res.ok) {
+    document.getElementById(`item-${itemId}`)?.remove();
+    const remaining = document.querySelectorAll('.item-card').length;
+    if (!remaining) loadWatchlist();
+  }
+}
+
+loadWatchlist();
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}演唱會歷史紀錄 — TicketPulse{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>📚 演唱會歷史紀錄</h2>
+</div>
+
+<div class="add-form card">
+  <h3>新增紀錄</h3>
+  <div class="form-grid">
+    <input type="text" id="h-name" class="input" placeholder="演唱會名稱 *" />
+    <input type="text" id="h-artist" class="input" placeholder="表演者 *" />
+    <input type="text" id="h-venue" class="input" placeholder="場地 *" />
+    <select id="h-status" class="input">
+      <option value="attended">✅ 已參加</option>
+      <option value="missed">❌ 未購到／錯過</option>
+      <option value="tracking">👀 追蹤中</option>
+    </select>
+    <input type="text" id="h-notes" class="input" placeholder="備注（選填）" style="grid-column: span 2" />
+  </div>
+  <button class="btn btn-primary" onclick="addHistory()">+ 新增紀錄</button>
+  <p id="history-msg" class="msg"></p>
+</div>
+
+<div id="history-container">
+  <p class="loading">載入中...</p>
+</div>
+
+<script>
+async function loadHistory() {
+  const res = await fetch('/api/history/');
+  const entries = await res.json();
+  const el = document.getElementById('history-container');
+
+  if (!entries.length) {
+    el.innerHTML = '<p class="empty-state">尚無歷史紀錄。使用上方表單新增！</p>';
+    return;
+  }
+
+  const statusLabel = { attended: '✅ 已參加', missed: '❌ 未參加', tracking: '👀 追蹤中' };
+  el.innerHTML = `
+    <div class="item-list">
+      ${entries.map(e => `
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-title">${e.concert.name}</div>
+            <div class="item-meta">
+              <span>🎤 ${e.concert.artist || '-'}</span>
+              <span>📍 ${e.concert.venue || '-'}</span>
+              <span class="tag tag-${e.status}">${statusLabel[e.status] || e.status}</span>
+            </div>
+            ${e.notes ? `<div class="item-notes">💬 ${e.notes}</div>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function addHistory() {
+  const name = document.getElementById('h-name').value.trim();
+  const artist = document.getElementById('h-artist').value.trim();
+  const venue = document.getElementById('h-venue').value.trim();
+  const status = document.getElementById('h-status').value;
+  const notes = document.getElementById('h-notes').value.trim();
+  const msg = document.getElementById('history-msg');
+
+  if (!name || !artist || !venue) {
+    msg.textContent = '請填寫演唱會名稱、表演者、場地';
+    msg.className = 'msg error';
+    return;
+  }
+
+  msg.textContent = '處理中...'; msg.className = 'msg';
+  const res = await fetch('/api/history/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ concert_name: name, artist, venue, status, notes: notes || null })
+  });
+
+  if (res.ok) {
+    msg.textContent = '✅ 已新增歷史紀錄！';
+    msg.className = 'msg success';
+    ['h-name','h-artist','h-venue','h-notes'].forEach(id => document.getElementById(id).value = '');
+    loadHistory();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = '❌ ' + (data.detail || '新增失敗');
+    msg.className = 'msg error';
+  }
+}
+
+loadHistory();
+</script>
+{% endblock %}

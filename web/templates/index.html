@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}TicketPulse — Feel every drop before it's gone{% endblock %}
+
+{% block content %}
+{% if not user_id %}
+<!-- Landing page for guests -->
+<section class="hero">
+  <h1>🎫 TicketPulse</h1>
+  <p class="hero-subtitle">Feel every drop before it's gone.</p>
+  <p class="hero-desc">
+    即時監控演唱會票券，搶先掌握開賣時機。<br>
+    支援 KKTIX、TixCraft、拓元、ibon、寬宏藝術。
+  </p>
+  {% if require_login %}
+    <p class="notice">請先登入才能使用此功能。</p>
+  {% endif %}
+  <a href="/auth/login" class="btn btn-discord btn-lg">
+    使用 Discord 登入
+  </a>
+  <div class="features">
+    <div class="feature-card">
+      <span class="feature-icon">🔔</span>
+      <h3>即時通知</h3>
+      <p>票券一開售，Discord DM 或 Email 立即通知你。</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🎯</span>
+      <h3>關注清單</h3>
+      <p>貼上售票網址，自動追蹤票券狀態，不再錯過。</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">📚</span>
+      <h3>演唱會紀錄</h3>
+      <p>記錄你參加過的每一場演唱會，打造專屬音樂地圖。</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">👥</span>
+      <h3>社群功能</h3>
+      <p>查看朋友的演唱會紀錄，找到共同的音樂夥伴。</p>
+    </div>
+  </div>
+</section>
+
+{% else %}
+<!-- Dashboard for logged-in users -->
+<section class="dashboard">
+  <h2>歡迎回來，{{ username }} 👋</h2>
+
+  <div class="dashboard-grid">
+    <div class="dash-card" id="dash-watchlist">
+      <div class="dash-card-header">
+        <span>🎯 關注清單</span>
+        <a href="/watchlist" class="btn btn-sm">管理</a>
+      </div>
+      <div class="dash-card-body" id="watchlist-summary">
+        <p class="loading">載入中...</p>
+      </div>
+    </div>
+
+    <div class="dash-card" id="dash-history">
+      <div class="dash-card-header">
+        <span>📚 歷史紀錄</span>
+        <a href="/history" class="btn btn-sm">查看全部</a>
+      </div>
+      <div class="dash-card-body" id="history-summary">
+        <p class="loading">載入中...</p>
+      </div>
+    </div>
+
+    <div class="dash-card dash-card-wide" id="dash-platforms">
+      <div class="dash-card-header">
+        <span>🌐 支援售票平台</span>
+      </div>
+      <div class="platform-list">
+        <span class="platform-badge">KKTIX</span>
+        <span class="platform-badge">TixCraft</span>
+        <span class="platform-badge">拓元 Ticket Plus</span>
+        <span class="platform-badge">ibon 7-ELEVEN</span>
+        <span class="platform-badge">寬宏藝術 Kham</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Load watchlist summary
+  fetch('/api/watchlist/')
+    .then(r => r.json())
+    .then(items => {
+      const el = document.getElementById('watchlist-summary');
+      if (!items.length) {
+        el.innerHTML = '<p class="empty">尚無關注的演唱會。<a href="/watchlist">新增第一筆</a></p>';
+        return;
+      }
+      el.innerHTML = items.slice(0, 3).map(item => `
+        <div class="summary-item">
+          <span class="summary-name">${item.concert.name}</span>
+          <span class="tag tag-${item.status}">${{watching:'關注中',notified:'已通知',expired:'已過期'}[item.status] || item.status}</span>
+        </div>
+      `).join('') + (items.length > 3 ? `<p class="more-link"><a href="/watchlist">查看全部 ${items.length} 筆</a></p>` : '');
+    })
+    .catch(() => {
+      document.getElementById('watchlist-summary').innerHTML = '<p class="error">載入失敗</p>';
+    });
+
+  // Load history summary
+  fetch('/api/history/')
+    .then(r => r.json())
+    .then(entries => {
+      const el = document.getElementById('history-summary');
+      const attended = entries.filter(e => e.status === 'attended').length;
+      if (!entries.length) {
+        el.innerHTML = '<p class="empty">尚無歷史紀錄。<a href="/history">新增</a></p>';
+        return;
+      }
+      el.innerHTML = `
+        <div class="stat-row">
+          <span class="stat">✅ 已參加：<strong>${attended}</strong> 場</span>
+          <span class="stat">📋 總計：<strong>${entries.length}</strong> 筆</span>
+        </div>
+        ${entries.slice(0, 2).map(e => `
+          <div class="summary-item">
+            <span class="summary-name">${e.concert.name}</span>
+            <span class="tag tag-${e.status}">${{attended:'已參加',missed:'未參加',tracking:'追蹤中'}[e.status] || e.status}</span>
+          </div>
+        `).join('')}
+      `;
+    })
+    .catch(() => {
+      document.getElementById('history-summary').innerHTML = '<p class="error">載入失敗</p>';
+    });
+</script>
+{% endif %}
+{% endblock %}

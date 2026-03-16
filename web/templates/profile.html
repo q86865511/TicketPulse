@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}個人資料 — TicketPulse{% endblock %}
+
+{% block content %}
+<div id="profile-container">
+  <p class="loading">載入中...</p>
+</div>
+
+<script>
+const targetDiscordId = "{{ target_discord_id | default('') }}";
+const selfDiscordId   = "{{ user_id | default('') }}";
+const isSelf = !targetDiscordId || targetDiscordId === selfDiscordId;
+const profileId = targetDiscordId || selfDiscordId;
+
+async function loadProfile() {
+  if (!profileId) {
+    document.getElementById('profile-container').innerHTML =
+      '<p class="empty-state">請先登入才能查看個人資料。<a href="/auth/login">登入</a></p>';
+    return;
+  }
+
+  const res = await fetch(`/api/profile/${profileId}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    document.getElementById('profile-container').innerHTML =
+      `<p class="error">${data.detail || '無法載入個人資料'}</p>`;
+    return;
+  }
+
+  const p = await res.json();
+  const visMap = { public: '🌐 公開', friends: '👥 僅好友', private: '🔒 私人' };
+
+  document.getElementById('profile-container').innerHTML = `
+    <div class="profile-card card">
+      <div class="profile-header">
+        ${p.avatar_url ? `<img class="profile-avatar" src="${p.avatar_url}" alt="avatar" />` : '<div class="profile-avatar-placeholder">👤</div>'}
+        <div>
+          <h2>${p.username}</h2>
+          <span class="tag">${visMap[p.profile_visibility] || p.profile_visibility}</span>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat-box"><span class="stat-num">${p.history_count}</span><span class="stat-label">歷史紀錄</span></div>
+        <div class="stat-box"><span class="stat-num">${p.watching_count}</span><span class="stat-label">關注中</span></div>
+      </div>
+
+      ${isSelf ? `
+      <div class="settings-section card">
+        <h3>⚙️ 通知設定</h3>
+        <div class="form-grid">
+          <label>通知方式</label>
+          <select id="pref-notify" class="input">
+            <option value="discord_dm">Discord 私訊 (DM)</option>
+            <option value="email">Email</option>
+            <option value="both">Discord DM + Email</option>
+          </select>
+          <label>個人資料可見度</label>
+          <select id="pref-vis" class="input">
+            <option value="public">🌐 公開</option>
+            <option value="friends">👥 僅好友</option>
+            <option value="private">🔒 私人</option>
+          </select>
+          <label>勿擾時段（開始小時）</label>
+          <input type="number" id="pref-qstart" class="input" min="0" max="23" placeholder="例：23" />
+          <label>勿擾時段（結束小時）</label>
+          <input type="number" id="pref-qend" class="input" min="0" max="23" placeholder="例：7" />
+          <label>Email 地址</label>
+          <input type="email" id="pref-email" class="input" placeholder="your@email.com" style="grid-column: span 2" />
+        </div>
+        <button class="btn btn-primary" onclick="savePrefs()">儲存設定</button>
+        <p id="pref-msg" class="msg"></p>
+      </div>
+      ` : `
+        ${!selfDiscordId ? '' : `
+          <div class="friend-actions">
+            <button class="btn btn-primary" onclick="sendFriendRequest('${p.discord_id}')">➕ 加為好友</button>
+            <p id="friend-msg" class="msg"></p>
+          </div>
+        `}
+      `}
+
+      ${p.concert_history && p.concert_history.length ? `
+      <div class="history-section">
+        <h3>📚 演唱會紀錄</h3>
+        <div class="item-list">
+          ${p.concert_history.slice(0,10).map(e => `
+            <div class="item-card">
+              <span class="item-title">${e.concert_name}</span>
+              <span class="tag tag-${e.status}">${{attended:'✅ 已參加',missed:'❌ 未參加',tracking:'👀 追蹤中'}[e.status]||e.status}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+
+  // Pre-fill settings if self
+  if (isSelf) {
+    const meRes = await fetch('/auth/me');
+    if (meRes.ok) {
+      const me = await meRes.json();
+      document.getElementById('pref-notify').value = me.notification_preference || 'discord_dm';
+      document.getElementById('pref-vis').value = me.profile_visibility || 'public';
+      if (me.email) document.getElementById('pref-email').value = me.email;
+    }
+  }
+}
+
+async function savePrefs() {
+  const msg = document.getElementById('pref-msg');
+  msg.textContent = '儲存中...'; msg.className = 'msg';
+
+  const body = {
+    notification_preference: document.getElementById('pref-notify').value,
+    profile_visibility: document.getElementById('pref-vis').value,
+  };
+  const qs = document.getElementById('pref-qstart').value;
+  const qe = document.getElementById('pref-qend').value;
+  const email = document.getElementById('pref-email').value.trim();
+  if (qs !== '') body.quiet_hours_start = parseInt(qs);
+  if (qe !== '') body.quiet_hours_end = parseInt(qe);
+  if (email) body.email = email;
+
+  const res = await fetch('/api/profile/me/preferences', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (res.ok) {
+    msg.textContent = '✅ 設定已儲存！'; msg.className = 'msg success';
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = '❌ ' + (data.detail || '儲存失敗'); msg.className = 'msg error';
+  }
+}
+
+async function sendFriendRequest(targetId) {
+  const res = await fetch(`/api/profile/friends/request/${targetId}`, { method: 'POST' });
+  const msg = document.getElementById('friend-msg');
+  if (res.ok) {
+    msg.textContent = '✅ 好友邀請已送出！'; msg.className = 'msg success';
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msg.textContent = '❌ ' + (data.detail || '傳送失敗'); msg.className = 'msg error';
+  }
+}
+
+loadProfile();
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}TicketPulse{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>" />
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="brand" href="/">🎫 TicketPulse</a>
+  <div class="nav-links">
+    {% if user_id %}
+      <a href="/watchlist">關注清單</a>
+      <a href="/history">歷史紀錄</a>
+      <a href="/profile">個人資料</a>
+      <div class="nav-user">
+        {% if avatar_url %}<img class="avatar" src="{{ avatar_url }}" alt="avatar" />{% endif %}
+        <span>{{ username }}</span>
+        <a href="/auth/logout" class="btn btn-outline">登出</a>
+      </div>
+    {% else %}
+      <a href="/auth/login" class="btn btn-discord">
+        <svg width="20" height="20" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M60.1 4.9A58.5 58.5 0 0 0 45.4.7a.2.2 0 0 0-.2.1c-.6 1.1-1.3 2.6-1.8 3.8a54 54 0 0 0-16.2 0 38.5 38.5 0 0 0-1.8-3.8.2.2 0 0 0-.2-.1A58.4 58.4 0 0 0 10.9 4.9a.2.2 0 0 0-.1.1C1.6 18.2-.9 31.1.3 43.8c0 .1.1.2.2.2a58.8 58.8 0 0 0 17.7 9 .2.2 0 0 0 .2-.1 42 42 0 0 0 3.6-5.9.2.2 0 0 0-.1-.3 38.7 38.7 0 0 1-5.5-2.6.2.2 0 0 1 0-.4l1.1-.8a.2.2 0 0 1 .2 0c11.5 5.3 23.9 5.3 35.3 0a.2.2 0 0 1 .2 0l1.1.8a.2.2 0 0 1 0 .4 36 36 0 0 1-5.5 2.6.2.2 0 0 0-.1.3 47 47 0 0 0 3.6 5.9c.1.1.2.1.3.1a58.6 58.6 0 0 0 17.7-9 .2.2 0 0 0 .1-.2c1.5-15.2-2.5-28-10.6-39.6a.2.2 0 0 0-.1-.2ZM23.7 36.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.3 6.4 7.2 0 4-2.8 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.6 0 6.5 3.3 6.4 7.2 0 4-2.8 7.2-6.4 7.2Z" fill="#fff"/>
+        </svg>
+        Discord 登入
+      </a>
+    {% endif %}
+  </div>
+</nav>
+
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <p>TicketPulse &copy; 2026 — Feel every drop before it's gone.</p>
+</footer>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
